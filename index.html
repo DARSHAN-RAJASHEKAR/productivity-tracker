@@ -80,41 +80,70 @@
                     <div class="sidebar-section">
                         <h3>Manage Lists</h3>
                         <div class="list-tabs">
-                            <button class="tab-btn active" data-tab="daily">
-                                <i class="fas fa-calendar-day"></i> Daily
+                            <button class="tab-btn active" data-tab="today">
+                                <i class="fas fa-sun"></i> Today
                             </button>
-                            <button class="tab-btn" data-tab="weekly">
-                                <i class="fas fa-calendar-week"></i> Weekly
+                            <button class="tab-btn" data-tab="fullweek">
+                                <i class="fas fa-calendar-week"></i> Full Week
                             </button>
-                            <button class="tab-btn" data-tab="monthly">
-                                <i class="fas fa-calendar-alt"></i> Monthly
+                            <button class="tab-btn" data-tab="fullmonth">
+                                <i class="fas fa-calendar-alt"></i> Full Month
+                            </button>
+                            <button class="tab-btn" data-tab="weekdays">
+                                <i class="fas fa-briefcase"></i> Weekdays
                             </button>
                             <button class="tab-btn" data-tab="habits">
                                 <i class="fas fa-heart"></i> Habits
                             </button>
                         </div>
                         
-                        <div class="list-content" id="daily-list">
-                            <div class="list-items" id="daily-items"></div>
+                        <div class="list-content" id="today-list">
+                            <div class="list-items" id="today-items"></div>
                             <div class="add-item">
-                                <input type="text" id="daily-input" placeholder="Add daily task...">
-                                <button onclick="addTask('daily')"><i class="fas fa-plus"></i></button>
+                                <input type="text" id="today-input" placeholder="Add today task...">
+                                <button onclick="addTask('today')"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
                         
-                        <div class="list-content hidden" id="weekly-list">
-                            <div class="list-items" id="weekly-items"></div>
+                        <div class="list-content hidden" id="fullweek-list">
+                            <div class="list-items" id="fullweek-items"></div>
                             <div class="add-item">
-                                <input type="text" id="weekly-input" placeholder="Add weekly task...">
-                                <button onclick="addTask('weekly')"><i class="fas fa-plus"></i></button>
+                                <input type="text" id="fullweek-input" placeholder="Add full week task...">
+                                <div class="task-options">
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" id="fullweek-daily-tracking">
+                                        <span>Daily tracking (complete each day)</span>
+                                    </label>
+                                </div>
+                                <button onclick="addTask('fullweek')"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
                         
-                        <div class="list-content hidden" id="monthly-list">
-                            <div class="list-items" id="monthly-items"></div>
+                        <div class="list-content hidden" id="fullmonth-list">
+                            <div class="list-items" id="fullmonth-items"></div>
                             <div class="add-item">
-                                <input type="text" id="monthly-input" placeholder="Add monthly task...">
-                                <button onclick="addTask('monthly')"><i class="fas fa-plus"></i></button>
+                                <input type="text" id="fullmonth-input" placeholder="Add full month task...">
+                                <div class="task-options">
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" id="fullmonth-daily-tracking">
+                                        <span>Daily tracking (complete each day)</span>
+                                    </label>
+                                </div>
+                                <button onclick="addTask('fullmonth')"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="list-content hidden" id="weekdays-list">
+                            <div class="list-items" id="weekdays-items"></div>
+                            <div class="add-item">
+                                <input type="text" id="weekdays-input" placeholder="Add weekdays task...">
+                                <div class="task-options">
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" id="weekdays-daily-tracking">
+                                        <span>Daily tracking (complete each day)</span>
+                                    </label>
+                                </div>
+                                <button onclick="addTask('weekdays')"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
                         
@@ -143,14 +172,14 @@
                 
                 <main class="management-content">
                     <div class="management-header">
-                        <h2 id="management-title">Daily Tasks</h2>
-                        <p id="management-subtitle">Manage your daily tasks and routines</p>
+                        <h2 id="management-title">Today Tasks</h2>
+                        <p id="management-subtitle">Manage your today tasks and routines</p>
                     </div>
                     
                     <div class="management-overview">
                         <div class="overview-card">
                             <div class="overview-number" id="current-list-count">0</div>
-                            <div class="overview-label" id="current-list-label">Daily Tasks</div>
+                            <div class="overview-label" id="current-list-label">Today Tasks</div>
                         </div>
                         <div class="overview-card">
                             <div class="overview-number" id="current-list-completed">0</div>
@@ -165,9 +194,9 @@
                     <div class="management-tips">
                         <h3>Tips</h3>
                         <div id="management-tips-content">
-                            <p><i class="fas fa-lightbulb"></i> Daily tasks help you maintain consistent habits and routines.</p>
-                            <p><i class="fas fa-lightbulb"></i> Keep daily tasks simple and achievable to build momentum.</p>
-                            <p><i class="fas fa-lightbulb"></i> Review and adjust your daily tasks weekly to stay relevant.</p>
+                            <p><i class="fas fa-lightbulb"></i> Today tasks expire at the end of the day to maintain focus.</p>
+                            <p><i class="fas fa-lightbulb"></i> Full week tasks run until Sunday of the current week.</p>
+                            <p><i class="fas fa-lightbulb"></i> Weekdays tasks run Monday through Friday only.</p>
                         </div>
                     </div>
                 </main>

@@ -1,20 +1,22 @@
 // Data structure
 let data = {
-    daily: [],
-    weekly: [],
-    monthly: [],
+    today: [],
+    fullweek: [],
+    fullmonth: [],
+    weekdays: [],
     habits: [],
     reminders: [],
     completions: {} // Track daily completions
 };
 
 // Current active tab and page
-let currentTab = 'daily';
+let currentTab = 'today';
 let currentPage = 'home';
 
 // Initialize app when page loads
 document.addEventListener('DOMContentLoaded', function() {
     loadData();
+    removeExpiredTasks(); // Clean up expired tasks on load
     updateCurrentDate();
     updateTodaysTasks();
     updateStats();
@@ -32,8 +34,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Initialize default tab
+    switchTab('today');
+    
     // Set up enter key handlers for inputs
-    ['daily', 'weekly', 'monthly', 'habits'].forEach(type => {
+    ['today', 'fullweek', 'fullmonth', 'weekdays', 'habits'].forEach(type => {
         const input = document.getElementById(`${type}-input`);
         if (input) {
             input.addEventListener('keypress', function(e) {
@@ -105,19 +110,107 @@ function showPage(page) {
     }
 }
 
+// Date calculation utilities
+function getEndOfDay() {
+    const date = new Date();
+    date.setHours(23, 59, 59, 999);
+    return date;
+}
+
+function getEndOfCurrentWeek() {
+    const date = new Date();
+    const day = date.getDay();
+    const daysUntilSunday = (7 - day) % 7;
+    const endDate = new Date(date);
+    endDate.setDate(date.getDate() + daysUntilSunday);
+    endDate.setHours(23, 59, 59, 999);
+    return endDate;
+}
+
+function getEndOfCurrentMonth() {
+    const date = new Date();
+    const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+    return endDate;
+}
+
+function getEndOfCurrentWeekdays() {
+    const date = new Date();
+    const day = date.getDay();
+    let daysUntilFriday;
+    
+    if (day === 0) { // Sunday
+        daysUntilFriday = 5; // Next Friday
+    } else if (day === 6) { // Saturday
+        daysUntilFriday = 6; // Next Friday
+    } else { // Monday to Friday
+        daysUntilFriday = 5 - day; // Days until Friday
+    }
+    
+    const endDate = new Date(date);
+    endDate.setDate(date.getDate() + daysUntilFriday);
+    endDate.setHours(23, 59, 59, 999);
+    return endDate;
+}
+
+function getTaskExpiryDate(type) {
+    switch(type) {
+        case 'today':
+            return getEndOfDay();
+        case 'fullweek':
+            return getEndOfCurrentWeek();
+        case 'fullmonth':
+            return getEndOfCurrentMonth();
+        case 'weekdays':
+            return getEndOfCurrentWeekdays();
+        default:
+            return null;
+    }
+}
+
+// Check if task has expired
+function isTaskExpired(task) {
+    if (!task.expiresAt) return false;
+    return new Date() > new Date(task.expiresAt);
+}
+
+// Remove expired tasks
+function removeExpiredTasks() {
+    ['today', 'fullweek', 'fullmonth', 'weekdays'].forEach(type => {
+        if (data[type] && Array.isArray(data[type])) {
+            data[type] = data[type].filter(task => !isTaskExpired(task));
+        }
+    });
+    saveData();
+}
+
 // Tab switching
 function switchTab(tab) {
+    console.log('switchTab called with:', tab);
+    
     // Update active tab button
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    
+    const tabButton = document.querySelector(`[data-tab="${tab}"]`);
+    if (tabButton) {
+        tabButton.classList.add('active');
+    } else {
+        console.error('Tab button not found for:', tab);
+    }
     
     // Show/hide content
     document.querySelectorAll('.list-content').forEach(content => {
         content.classList.add('hidden');
     });
-    document.getElementById(`${tab}-list`).classList.remove('hidden');
+    
+    const tabContent = document.getElementById(`${tab}-list`);
+    if (tabContent) {
+        tabContent.classList.remove('hidden');
+    } else {
+        console.error('Tab content not found for:', tab);
+    }
     
     currentTab = tab;
     updateListDisplay(tab);
@@ -126,20 +219,38 @@ function switchTab(tab) {
 
 // Add task to list
 function addTask(type) {
+    console.log('addTask called with type:', type);
     const input = document.getElementById(`${type}-input`);
-    const text = input.value.trim();
+    console.log('Input element found:', input);
+    const text = input ? input.value.trim() : '';
+    console.log('Text value:', text);
     
-    if (!text) return;
+    if (!text) {
+        console.log('No text, returning');
+        return;
+    }
+    
+    // Check if daily tracking is enabled for this task type
+    const dailyTrackingCheckbox = document.getElementById(`${type}-daily-tracking`);
+    const isDailyTracking = dailyTrackingCheckbox ? dailyTrackingCheckbox.checked : false;
     
     const task = {
         id: Date.now(),
         text: text,
         completed: false,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        expiresAt: getTaskExpiryDate(type)?.toISOString() || null,
+        isDailyTracking: isDailyTracking,
+        dailyCompletions: {} // Track completions by date for daily tracking tasks
     };
     
     data[type].push(task);
     input.value = '';
+    
+    // Reset daily tracking checkbox
+    if (dailyTrackingCheckbox) {
+        dailyTrackingCheckbox.checked = false;
+    }
     
     updateListDisplay(type);
     updateTodaysTasks();
@@ -209,10 +320,24 @@ function updateListDisplay(type) {
                 </button>
             `;
         } else {
+            const today = new Date().toDateString();
+            const isCompletedToday = item.isDailyTracking ? 
+                (item.dailyCompletions && item.dailyCompletions[today]) : 
+                item.completed;
+            
+            let completionInfo = '';
+            if (item.isDailyTracking) {
+                const completedDays = Object.values(item.dailyCompletions || {}).filter(Boolean).length;
+                completionInfo = `<small style="display: block; color: #64748b;">Daily tracking - ${completedDays} days completed</small>`;
+            }
+            
             div.innerHTML = `
-                <input type="checkbox" ${item.completed ? 'checked' : ''} 
+                <input type="checkbox" ${isCompletedToday ? 'checked' : ''} 
                        onchange="toggleTask('${type}', ${item.id})">
-                <span class="list-item-text">${item.text}</span>
+                <span class="list-item-text">
+                    ${item.text}
+                    ${completionInfo}
+                </span>
                 <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -227,7 +352,18 @@ function updateListDisplay(type) {
 function toggleTask(type, id) {
     const item = data[type].find(task => task.id === id);
     if (item) {
-        item.completed = !item.completed;
+        if (item.isDailyTracking) {
+            // Handle daily tracking tasks
+            const today = new Date().toDateString();
+            if (!item.dailyCompletions) {
+                item.dailyCompletions = {};
+            }
+            item.dailyCompletions[today] = !item.dailyCompletions[today];
+        } else {
+            // Handle regular tasks
+            item.completed = !item.completed;
+        }
+        
         updateListDisplay(type);
         updateTodaysTasks();
         updateStats();
@@ -305,25 +441,28 @@ function updateTodaysTasks() {
     
     const now = new Date();
     const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const dayOfMonth = now.getDate();
-    const isFirstWeek = dayOfMonth <= 7;
     
     let todaysTasks = [];
     
-    // Add daily tasks
-    data.daily.forEach(task => {
-        todaysTasks.push({ ...task, type: 'daily' });
+    // Add today tasks (always show)
+    data.today.forEach(task => {
+        todaysTasks.push({ ...task, type: 'today' });
     });
     
-    // Add weekly tasks (show on appropriate days)
-    data.weekly.forEach(task => {
-        todaysTasks.push({ ...task, type: 'weekly' });
+    // Add full week tasks (always show during the week)
+    data.fullweek.forEach(task => {
+        todaysTasks.push({ ...task, type: 'fullweek' });
     });
     
-    // Add monthly tasks (show on first week of month)
-    if (isFirstWeek) {
-        data.monthly.forEach(task => {
-            todaysTasks.push({ ...task, type: 'monthly' });
+    // Add full month tasks (always show during the month)
+    data.fullmonth.forEach(task => {
+        todaysTasks.push({ ...task, type: 'fullmonth' });
+    });
+    
+    // Add weekdays tasks (only Monday to Friday)
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        data.weekdays.forEach(task => {
+            todaysTasks.push({ ...task, type: 'weekdays' });
         });
     }
     
@@ -332,14 +471,21 @@ function updateTodaysTasks() {
         return;
     }
     
-    container.innerHTML = todaysTasks.map(task => `
-        <div class="task-item ${task.completed ? 'completed' : ''}">
-            <input type="checkbox" ${task.completed ? 'checked' : ''} 
-                   onchange="toggleTask('${task.type}', ${task.id})">
-            <span class="task-text">${task.text}</span>
-            <span class="task-type ${task.type}">${task.type}</span>
-        </div>
-    `).join('');
+    container.innerHTML = todaysTasks.map(task => {
+        const today = new Date().toDateString();
+        const isCompletedToday = task.isDailyTracking ? 
+            (task.dailyCompletions && task.dailyCompletions[today]) : 
+            task.completed;
+        
+        return `
+            <div class="task-item ${isCompletedToday ? 'completed' : ''}">
+                <input type="checkbox" ${isCompletedToday ? 'checked' : ''} 
+                       onchange="toggleTask('${task.type}', ${task.id})">
+                <span class="task-text">${task.text}</span>
+                <span class="task-type ${task.type}">${task.type}${task.isDailyTracking ? ' (daily)' : ''}</span>
+            </div>
+        `;
+    }).join('');
 }
 
 // Update statistics
@@ -350,25 +496,39 @@ function updateStats() {
     // Calculate today's completed and total tasks
     let completedToday = 0;
     let totalToday = 0;
+    const dayOfWeek = now.getDay();
     
-    // Count daily tasks
-    data.daily.forEach(task => {
+    // Helper function to check if task is completed for today
+    const isTaskCompletedToday = (task) => {
+        if (task.isDailyTracking) {
+            return task.dailyCompletions && task.dailyCompletions[today];
+        }
+        return task.completed;
+    };
+    
+    // Count today tasks
+    data.today.forEach(task => {
         totalToday++;
-        if (task.completed) completedToday++;
+        if (isTaskCompletedToday(task)) completedToday++;
     });
     
-    // Count weekly tasks
-    data.weekly.forEach(task => {
+    // Count full week tasks
+    data.fullweek.forEach(task => {
         totalToday++;
-        if (task.completed) completedToday++;
+        if (isTaskCompletedToday(task)) completedToday++;
     });
     
-    // Count monthly tasks (only in first week)
-    const dayOfMonth = now.getDate();
-    if (dayOfMonth <= 7) {
-        data.monthly.forEach(task => {
+    // Count full month tasks
+    data.fullmonth.forEach(task => {
+        totalToday++;
+        if (isTaskCompletedToday(task)) completedToday++;
+    });
+    
+    // Count weekdays tasks (only Monday to Friday)
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        data.weekdays.forEach(task => {
             totalToday++;
-            if (task.completed) completedToday++;
+            if (isTaskCompletedToday(task)) completedToday++;
         });
     }
     
@@ -588,18 +748,40 @@ function loadData() {
     const saved = localStorage.getItem('productivityData');
     if (saved) {
         try {
-            data = JSON.parse(saved);
+            const loadedData = JSON.parse(saved);
+            // Merge with default structure to ensure all properties exist
+            data = {
+                today: loadedData.today || loadedData.daily || [],
+                fullweek: loadedData.fullweek || loadedData.weekly || [],
+                fullmonth: loadedData.fullmonth || loadedData.monthly || [],
+                weekdays: loadedData.weekdays || [],
+                habits: loadedData.habits || [],
+                reminders: loadedData.reminders || [],
+                completions: loadedData.completions || {}
+            };
         } catch (error) {
             console.error('Error loading saved data:', error);
             data = {
-                daily: [],
-                weekly: [],
-                monthly: [],
+                today: [],
+                fullweek: [],
+                fullmonth: [],
+                weekdays: [],
                 habits: [],
                 reminders: [],
                 completions: {}
             };
         }
+    } else {
+        // Initialize with default structure
+        data = {
+            today: [],
+            fullweek: [],
+            fullmonth: [],
+            weekdays: [],
+            habits: [],
+            reminders: [],
+            completions: {}
+        };
     }
     
     // Request notification permission
@@ -615,34 +797,44 @@ function updateManagementView() {
     if (currentPage !== 'management') return;
     
     const tabNames = {
-        daily: 'Daily Tasks',
-        weekly: 'Weekly Tasks',
-        monthly: 'Monthly Tasks',
+        today: 'Today Tasks',
+        fullweek: 'Full Week Tasks',
+        fullmonth: 'Full Month Tasks',
+        weekdays: 'Weekdays Tasks',
         habits: 'Habits'
     };
     
     const tabDescriptions = {
-        daily: 'Manage your daily tasks and routines',
-        weekly: 'Plan your weekly goals and objectives',
-        monthly: 'Set monthly milestones and projects',
+        today: 'Tasks that expire at end of day',
+        fullweek: 'Tasks that run until end of current week',
+        fullmonth: 'Tasks that run until end of current month',
+        weekdays: 'Tasks that run Monday through Friday only',
         habits: 'Track and build positive habits'
     };
     
     const tips = {
-        daily: [
-            'Daily tasks help you maintain consistent habits and routines.',
-            'Keep daily tasks simple and achievable to build momentum.',
-            'Review and adjust your daily tasks weekly to stay relevant.'
+        today: [
+            'Today tasks expire at the end of the day to maintain focus.',
+            'Keep today tasks simple and achievable.',
+            'Perfect for urgent or daily routine items.'
         ],
-        weekly: [
-            'Weekly tasks should align with your larger goals.',
-            'Break down big projects into weekly milestones.',
-            'Review weekly progress every Sunday to plan ahead.'
+        fullweek: [
+            'Full week tasks run until Sunday of the current week.',
+            'Great for weekly goals and objectives.',
+            'Tasks created mid-week still expire on Sunday.',
+            'Use "Daily tracking" to complete the same task each day of the week.'
         ],
-        monthly: [
-            'Monthly tasks are perfect for larger projects and goals.',
-            'Set 3-5 key monthly objectives to maintain focus.',
-            'Monthly reviews help you stay on track with long-term goals.'
+        fullmonth: [
+            'Full month tasks run until the end of the current month.',
+            'Perfect for monthly projects and larger goals.',
+            'Tasks created mid-month still expire at month end.',
+            'Enable "Daily tracking" to track daily progress throughout the month.'
+        ],
+        weekdays: [
+            'Weekdays tasks run Monday through Friday only.',
+            'Perfect for work-related or business day tasks.',
+            'Tasks created mid-week run until Friday.',
+            'Use "Daily tracking" for tasks you need to complete every workday.'
         ],
         habits: [
             'Start with small, easy habits to build consistency.',
