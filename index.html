@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Productivity Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <nav class="top-nav">
+            <div class="nav-brand">
+                <h1><i class="fas fa-tasks"></i> Productivity</h1>
+            </div>
+            <div class="nav-tabs">
+                <button class="nav-btn active" onclick="showPage('home')">
+                    <i class="fas fa-home"></i> Home
+                </button>
+                <button class="nav-btn" onclick="showPage('management')">
+                    <i class="fas fa-cog"></i> Management
+                </button>
+            </div>
+        </nav>
+        
+        <!-- HOME PAGE -->
+        <div class="page" id="home-page">
+            <div class="page-content">
+                <header class="dashboard-header">
+                    <div class="date-info">
+                        <h2 id="current-date"></h2>
+                        <p id="current-day"></p>
+                    </div>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="completed-today">0</div>
+                            <div class="stat-label">Completed Today</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-today">0</div>
+                            <div class="stat-label">Total Today</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="streak-count">0</div>
+                            <div class="stat-label">Current Streak</div>
+                        </div>
+                    </div>
+                </header>
+                
+                <section class="dashboard-content">
+                    <div class="today-tasks">
+                        <h3><i class="fas fa-list-check"></i> Today's Tasks</h3>
+                        <div class="task-list" id="today-tasks"></div>
+                    </div>
+                    
+                    <div class="habits-tracker">
+                        <h3><i class="fas fa-chart-line"></i> Habit Tracker</h3>
+                        <div class="habits-grid" id="habits-tracker"></div>
+                    </div>
+                    
+                    <div class="reminders">
+                        <h3><i class="fas fa-bell"></i> Reminders</h3>
+                        <div class="reminders-list" id="reminders-list">
+                            <p class="no-reminders">No reminders set</p>
+                        </div>
+                        <div class="add-reminder">
+                            <input type="text" id="reminder-text" placeholder="Add reminder...">
+                            <input type="datetime-local" id="reminder-time">
+                            <button onclick="addReminder()"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+        
+        <!-- MANAGEMENT PAGE -->
+        <div class="page hidden" id="management-page">
+            <div class="management-layout">
+                <aside class="sidebar">
+                    <div class="sidebar-section">
+                        <h3>Manage Lists</h3>
+                        <div class="list-tabs">
+                            <button class="tab-btn active" data-tab="daily">
+                                <i class="fas fa-calendar-day"></i> Daily
+                            </button>
+                            <button class="tab-btn" data-tab="weekly">
+                                <i class="fas fa-calendar-week"></i> Weekly
+                            </button>
+                            <button class="tab-btn" data-tab="monthly">
+                                <i class="fas fa-calendar-alt"></i> Monthly
+                            </button>
+                            <button class="tab-btn" data-tab="habits">
+                                <i class="fas fa-heart"></i> Habits
+                            </button>
+                        </div>
+                        
+                        <div class="list-content" id="daily-list">
+                            <div class="list-items" id="daily-items"></div>
+                            <div class="add-item">
+                                <input type="text" id="daily-input" placeholder="Add daily task...">
+                                <button onclick="addTask('daily')"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="list-content hidden" id="weekly-list">
+                            <div class="list-items" id="weekly-items"></div>
+                            <div class="add-item">
+                                <input type="text" id="weekly-input" placeholder="Add weekly task...">
+                                <button onclick="addTask('weekly')"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="list-content hidden" id="monthly-list">
+                            <div class="list-items" id="monthly-items"></div>
+                            <div class="add-item">
+                                <input type="text" id="monthly-input" placeholder="Add monthly task...">
+                                <button onclick="addTask('monthly')"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="list-content hidden" id="habits-list">
+                            <div class="list-items" id="habits-items"></div>
+                            <div class="add-item">
+                                <input type="text" id="habits-input" placeholder="Add habit...">
+                                <button onclick="addHabit()"><i class="fas fa-plus"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h3>Quick Actions</h3>
+                        <button class="action-btn" onclick="clearCompleted()">
+                            <i class="fas fa-broom"></i> Clear Completed
+                        </button>
+                        <button class="action-btn" onclick="exportData()">
+                            <i class="fas fa-download"></i> Export Data
+                        </button>
+                        <button class="action-btn" onclick="importData()">
+                            <i class="fas fa-upload"></i> Import Data
+                        </button>
+                    </div>
+                </aside>
+                
+                <main class="management-content">
+                    <div class="management-header">
+                        <h2 id="management-title">Daily Tasks</h2>
+                        <p id="management-subtitle">Manage your daily tasks and routines</p>
+                    </div>
+                    
+                    <div class="management-overview">
+                        <div class="overview-card">
+                            <div class="overview-number" id="current-list-count">0</div>
+                            <div class="overview-label" id="current-list-label">Daily Tasks</div>
+                        </div>
+                        <div class="overview-card">
+                            <div class="overview-number" id="current-list-completed">0</div>
+                            <div class="overview-label">Completed</div>
+                        </div>
+                        <div class="overview-card">
+                            <div class="overview-number" id="current-list-pending">0</div>
+                            <div class="overview-label">Pending</div>
+                        </div>
+                    </div>
+                    
+                    <div class="management-tips">
+                        <h3>Tips</h3>
+                        <div id="management-tips-content">
+                            <p><i class="fas fa-lightbulb"></i> Daily tasks help you maintain consistent habits and routines.</p>
+                            <p><i class="fas fa-lightbulb"></i> Keep daily tasks simple and achievable to build momentum.</p>
+                            <p><i class="fas fa-lightbulb"></i> Review and adjust your daily tasks weekly to stay relevant.</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <input type="file" id="import-file" accept=".json" style="display: none;">
+    
+    <script src="script.js"></script>
+</body>
+</html>

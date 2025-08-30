@@ -1,0 +1,679 @@
+// Data structure
+let data = {
+    daily: [],
+    weekly: [],
+    monthly: [],
+    habits: [],
+    reminders: [],
+    completions: {} // Track daily completions
+};
+
+// Current active tab and page
+let currentTab = 'daily';
+let currentPage = 'home';
+
+// Initialize app when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadData();
+    updateCurrentDate();
+    updateTodaysTasks();
+    updateStats();
+    updateHabitsTracker();
+    updateReminders();
+    updateManagementView();
+    
+    // Show home page by default
+    showPage('home');
+    
+    // Set up tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            switchTab(this.dataset.tab);
+        });
+    });
+    
+    // Set up enter key handlers for inputs
+    ['daily', 'weekly', 'monthly', 'habits'].forEach(type => {
+        const input = document.getElementById(`${type}-input`);
+        if (input) {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    if (type === 'habits') {
+                        addHabit();
+                    } else {
+                        addTask(type);
+                    }
+                }
+            });
+        }
+    });
+    
+    // Set up reminder input handlers
+    const reminderText = document.getElementById('reminder-text');
+    if (reminderText) {
+        reminderText.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addReminder();
+            }
+        });
+    }
+    
+    // Set up import file handler
+    const importFile = document.getElementById('import-file');
+    if (importFile) {
+        importFile.addEventListener('change', handleFileImport);
+    }
+    
+    // Check reminders every minute
+    setInterval(checkReminders, 60000);
+    checkReminders(); // Initial check
+});
+
+// Update current date display
+function updateCurrentDate() {
+    const now = new Date();
+    const dateOptions = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    };
+    const dayOptions = { weekday: 'long' };
+    
+    document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', dateOptions);
+    document.getElementById('current-day').textContent = `Today is ${now.toLocaleDateString('en-US', dayOptions)}`;
+}
+
+// Page switching
+function showPage(page) {
+    // Update active nav button
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[onclick="showPage('${page}')"]`).classList.add('active');
+    
+    // Show/hide pages
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.add('hidden');
+    });
+    document.getElementById(`${page}-page`).classList.remove('hidden');
+    
+    currentPage = page;
+    
+    if (page === 'management') {
+        updateManagementView();
+    }
+}
+
+// Tab switching
+function switchTab(tab) {
+    // Update active tab button
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    
+    // Show/hide content
+    document.querySelectorAll('.list-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+    document.getElementById(`${tab}-list`).classList.remove('hidden');
+    
+    currentTab = tab;
+    updateListDisplay(tab);
+    updateManagementView();
+}
+
+// Add task to list
+function addTask(type) {
+    const input = document.getElementById(`${type}-input`);
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    const task = {
+        id: Date.now(),
+        text: text,
+        completed: false,
+        createdAt: new Date().toISOString()
+    };
+    
+    data[type].push(task);
+    input.value = '';
+    
+    updateListDisplay(type);
+    updateTodaysTasks();
+    updateStats();
+    if (currentPage === 'management') {
+        updateManagementView();
+    }
+    
+    saveData();
+}
+
+// Add habit
+function addHabit() {
+    const input = document.getElementById('habits-input');
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    const habit = {
+        id: Date.now(),
+        text: text,
+        streak: 0,
+        lastCompleted: null,
+        createdAt: new Date().toISOString()
+    };
+    
+    data.habits.push(habit);
+    input.value = '';
+    
+    updateListDisplay('habits');
+    updateHabitsTracker();
+    if (currentPage === 'management') {
+        updateManagementView();
+    }
+    
+    saveData();
+}
+
+// Update list display in sidebar
+function updateListDisplay(type) {
+    const container = document.getElementById(`${type}-items`);
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const items = data[type] || [];
+    
+    if (items.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #64748b; font-style: italic; padding: 1rem;">No items yet</p>';
+        return;
+    }
+    
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = `list-item ${item.completed ? 'completed' : ''}`;
+        
+        if (type === 'habits') {
+            div.innerHTML = `
+                <input type="checkbox" ${item.streak > 0 && isCompletedToday(item) ? 'checked' : ''} 
+                       onchange="toggleHabit(${item.id})">
+                <span class="list-item-text">
+                    ${item.text}
+                    <small style="display: block; color: #64748b;">Streak: ${item.streak} days</small>
+                </span>
+                <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+        } else {
+            div.innerHTML = `
+                <input type="checkbox" ${item.completed ? 'checked' : ''} 
+                       onchange="toggleTask('${type}', ${item.id})">
+                <span class="list-item-text">${item.text}</span>
+                <button class="delete-btn" onclick="deleteItem('${type}', ${item.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+        }
+        
+        container.appendChild(div);
+    });
+}
+
+// Toggle task completion
+function toggleTask(type, id) {
+    const item = data[type].find(task => task.id === id);
+    if (item) {
+        item.completed = !item.completed;
+        updateListDisplay(type);
+        updateTodaysTasks();
+        updateStats();
+        if (currentPage === 'management') {
+            updateManagementView();
+        }
+        saveData();
+    }
+}
+
+// Toggle habit completion
+function toggleHabit(id) {
+    const habit = data.habits.find(h => h.id === id);
+    if (!habit) return;
+    
+    const today = new Date().toDateString();
+    const wasCompletedToday = isCompletedToday(habit);
+    
+    if (wasCompletedToday) {
+        // Uncheck - decrease streak
+        habit.streak = Math.max(0, habit.streak - 1);
+        habit.lastCompleted = habit.streak > 0 ? 
+            new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() : null;
+    } else {
+        // Check - increase streak
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString();
+        const lastCompletedDate = habit.lastCompleted ? 
+            new Date(habit.lastCompleted).toDateString() : null;
+        
+        if (!habit.lastCompleted || lastCompletedDate === yesterday) {
+            habit.streak += 1;
+        } else {
+            habit.streak = 1; // Reset streak if not consecutive
+        }
+        
+        habit.lastCompleted = new Date().toISOString();
+    }
+    
+    updateListDisplay('habits');
+    updateHabitsTracker();
+    updateStats();
+    saveData();
+}
+
+// Check if habit was completed today
+function isCompletedToday(habit) {
+    if (!habit.lastCompleted) return false;
+    const today = new Date().toDateString();
+    const lastCompletedDate = new Date(habit.lastCompleted).toDateString();
+    return today === lastCompletedDate;
+}
+
+// Delete item
+function deleteItem(type, id) {
+    if (confirm('Are you sure you want to delete this item?')) {
+        data[type] = data[type].filter(item => item.id !== id);
+        updateListDisplay(type);
+        if (type !== 'habits') {
+            updateTodaysTasks();
+            updateStats();
+        } else {
+            updateHabitsTracker();
+        }
+        if (currentPage === 'management') {
+            updateManagementView();
+        }
+        saveData();
+    }
+}
+
+// Update today's tasks in dashboard
+function updateTodaysTasks() {
+    const container = document.getElementById('today-tasks');
+    if (!container) return;
+    
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayOfMonth = now.getDate();
+    const isFirstWeek = dayOfMonth <= 7;
+    
+    let todaysTasks = [];
+    
+    // Add daily tasks
+    data.daily.forEach(task => {
+        todaysTasks.push({ ...task, type: 'daily' });
+    });
+    
+    // Add weekly tasks (show on appropriate days)
+    data.weekly.forEach(task => {
+        todaysTasks.push({ ...task, type: 'weekly' });
+    });
+    
+    // Add monthly tasks (show on first week of month)
+    if (isFirstWeek) {
+        data.monthly.forEach(task => {
+            todaysTasks.push({ ...task, type: 'monthly' });
+        });
+    }
+    
+    if (todaysTasks.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #64748b; font-style: italic; padding: 2rem;">No tasks for today</p>';
+        return;
+    }
+    
+    container.innerHTML = todaysTasks.map(task => `
+        <div class="task-item ${task.completed ? 'completed' : ''}">
+            <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                   onchange="toggleTask('${task.type}', ${task.id})">
+            <span class="task-text">${task.text}</span>
+            <span class="task-type ${task.type}">${task.type}</span>
+        </div>
+    `).join('');
+}
+
+// Update statistics
+function updateStats() {
+    const now = new Date();
+    const today = now.toDateString();
+    
+    // Calculate today's completed and total tasks
+    let completedToday = 0;
+    let totalToday = 0;
+    
+    // Count daily tasks
+    data.daily.forEach(task => {
+        totalToday++;
+        if (task.completed) completedToday++;
+    });
+    
+    // Count weekly tasks
+    data.weekly.forEach(task => {
+        totalToday++;
+        if (task.completed) completedToday++;
+    });
+    
+    // Count monthly tasks (only in first week)
+    const dayOfMonth = now.getDate();
+    if (dayOfMonth <= 7) {
+        data.monthly.forEach(task => {
+            totalToday++;
+            if (task.completed) completedToday++;
+        });
+    }
+    
+    // Calculate current streak (consecutive days with all tasks completed)
+    let streak = 0;
+    const completionHistory = data.completions || {};
+    let checkDate = new Date(now);
+    
+    while (true) {
+        const dateStr = checkDate.toDateString();
+        if (completionHistory[dateStr] === true) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+    
+    // Update completion for today if all tasks are done
+    if (totalToday > 0 && completedToday === totalToday) {
+        data.completions[today] = true;
+    } else {
+        data.completions[today] = false;
+    }
+    
+    // Update display
+    document.getElementById('completed-today').textContent = completedToday;
+    document.getElementById('total-today').textContent = totalToday;
+    document.getElementById('streak-count').textContent = streak;
+    
+    saveData();
+}
+
+// Update habits tracker in dashboard
+function updateHabitsTracker() {
+    const container = document.getElementById('habits-tracker');
+    if (!container) return;
+    
+    if (data.habits.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #64748b; font-style: italic; padding: 2rem;">No habits tracked</p>';
+        return;
+    }
+    
+    container.innerHTML = data.habits.map(habit => `
+        <div class="habit-item">
+            <div class="habit-info">
+                <div class="habit-name">${habit.text}</div>
+                <div class="habit-streak">${habit.streak} day streak</div>
+            </div>
+            <input type="checkbox" class="habit-check" 
+                   ${isCompletedToday(habit) ? 'checked' : ''} 
+                   onchange="toggleHabit(${habit.id})">
+        </div>
+    `).join('');
+}
+
+// Add reminder
+function addReminder() {
+    const textInput = document.getElementById('reminder-text');
+    const timeInput = document.getElementById('reminder-time');
+    
+    const text = textInput.value.trim();
+    const time = timeInput.value;
+    
+    if (!text || !time) {
+        alert('Please enter both reminder text and time');
+        return;
+    }
+    
+    const reminder = {
+        id: Date.now(),
+        text: text,
+        time: new Date(time).toISOString(),
+        completed: false
+    };
+    
+    data.reminders.push(reminder);
+    textInput.value = '';
+    timeInput.value = '';
+    
+    updateReminders();
+    saveData();
+}
+
+// Update reminders display
+function updateReminders() {
+    const container = document.getElementById('reminders-list');
+    if (!container) return;
+    
+    const activeReminders = data.reminders.filter(r => !r.completed);
+    
+    if (activeReminders.length === 0) {
+        container.innerHTML = '<p class="no-reminders">No reminders set</p>';
+        return;
+    }
+    
+    // Sort by time
+    activeReminders.sort((a, b) => new Date(a.time) - new Date(b.time));
+    
+    const now = new Date();
+    
+    container.innerHTML = activeReminders.map(reminder => {
+        const reminderTime = new Date(reminder.time);
+        const isOverdue = reminderTime < now;
+        
+        return `
+            <div class="reminder-item ${isOverdue ? 'overdue' : ''}">
+                <div class="reminder-text">${reminder.text}</div>
+                <div class="reminder-time">${reminderTime.toLocaleString()}</div>
+                <button class="delete-btn" onclick="deleteReminder(${reminder.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
+
+// Delete reminder
+function deleteReminder(id) {
+    data.reminders = data.reminders.filter(r => r.id !== id);
+    updateReminders();
+    saveData();
+}
+
+// Check for overdue reminders
+function checkReminders() {
+    const now = new Date();
+    data.reminders.forEach(reminder => {
+        const reminderTime = new Date(reminder.time);
+        if (reminderTime <= now && !reminder.completed && !reminder.notified) {
+            // Show notification (if browser supports it)
+            if (Notification.permission === 'granted') {
+                new Notification('Reminder', {
+                    body: reminder.text,
+                    icon: '/favicon.ico'
+                });
+            }
+            reminder.notified = true;
+        }
+    });
+    saveData();
+}
+
+// Clear completed tasks
+function clearCompleted() {
+    if (confirm('Are you sure you want to clear all completed tasks?')) {
+        data.daily = data.daily.filter(task => !task.completed);
+        data.weekly = data.weekly.filter(task => !task.completed);
+        data.monthly = data.monthly.filter(task => !task.completed);
+        
+        updateListDisplay(currentTab);
+        updateTodaysTasks();
+        updateStats();
+        if (currentPage === 'management') {
+            updateManagementView();
+        }
+        saveData();
+    }
+}
+
+// Export data
+function exportData() {
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `productivity-data-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    URL.revokeObjectURL(url);
+}
+
+// Import data
+function importData() {
+    document.getElementById('import-file').click();
+}
+
+// Handle file import
+function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            
+            if (confirm('This will replace all current data. Are you sure?')) {
+                data = importedData;
+                updateListDisplay(currentTab);
+                updateTodaysTasks();
+                updateStats();
+                updateHabitsTracker();
+                updateReminders();
+                if (currentPage === 'management') {
+                    updateManagementView();
+                }
+                saveData();
+                alert('Data imported successfully!');
+            }
+        } catch (error) {
+            alert('Error importing data. Please check the file format.');
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Save data to localStorage
+function saveData() {
+    localStorage.setItem('productivityData', JSON.stringify(data));
+}
+
+// Load data from localStorage
+function loadData() {
+    const saved = localStorage.getItem('productivityData');
+    if (saved) {
+        try {
+            data = JSON.parse(saved);
+        } catch (error) {
+            console.error('Error loading saved data:', error);
+            data = {
+                daily: [],
+                weekly: [],
+                monthly: [],
+                habits: [],
+                reminders: [],
+                completions: {}
+            };
+        }
+    }
+    
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+    
+    updateListDisplay(currentTab);
+}
+
+// Update management view with current tab info
+function updateManagementView() {
+    if (currentPage !== 'management') return;
+    
+    const tabNames = {
+        daily: 'Daily Tasks',
+        weekly: 'Weekly Tasks',
+        monthly: 'Monthly Tasks',
+        habits: 'Habits'
+    };
+    
+    const tabDescriptions = {
+        daily: 'Manage your daily tasks and routines',
+        weekly: 'Plan your weekly goals and objectives',
+        monthly: 'Set monthly milestones and projects',
+        habits: 'Track and build positive habits'
+    };
+    
+    const tips = {
+        daily: [
+            'Daily tasks help you maintain consistent habits and routines.',
+            'Keep daily tasks simple and achievable to build momentum.',
+            'Review and adjust your daily tasks weekly to stay relevant.'
+        ],
+        weekly: [
+            'Weekly tasks should align with your larger goals.',
+            'Break down big projects into weekly milestones.',
+            'Review weekly progress every Sunday to plan ahead.'
+        ],
+        monthly: [
+            'Monthly tasks are perfect for larger projects and goals.',
+            'Set 3-5 key monthly objectives to maintain focus.',
+            'Monthly reviews help you stay on track with long-term goals.'
+        ],
+        habits: [
+            'Start with small, easy habits to build consistency.',
+            'Track habits daily to maintain accountability.',
+            'Celebrate streaks to reinforce positive behaviors.'
+        ]
+    };
+    
+    // Update header
+    document.getElementById('management-title').textContent = tabNames[currentTab];
+    document.getElementById('management-subtitle').textContent = tabDescriptions[currentTab];
+    
+    // Update overview cards
+    const currentList = data[currentTab] || [];
+    const completed = currentList.filter(item => {
+        if (currentTab === 'habits') {
+            return isCompletedToday(item);
+        } else {
+            return item.completed;
+        }
+    }).length;
+    const pending = currentList.length - completed;
+    
+    document.getElementById('current-list-count').textContent = currentList.length;
+    document.getElementById('current-list-label').textContent = tabNames[currentTab];
+    document.getElementById('current-list-completed').textContent = completed;
+    document.getElementById('current-list-pending').textContent = pending;
+    
+    // Update tips
+    const tipsContent = document.getElementById('management-tips-content');
+    tipsContent.innerHTML = tips[currentTab].map(tip => 
+        `<p><i class="fas fa-lightbulb"></i> ${tip}</p>`
+    ).join('');
+}
