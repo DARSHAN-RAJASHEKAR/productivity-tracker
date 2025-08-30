@@ -270,6 +270,25 @@ body {
     flex-shrink: 0;
 }
 
+.checkbox-option input[type="time"] {
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    background: white;
+    width: 100px;
+    max-width: 100px;
+}
+
+.checkbox-option input[type="time"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
 .checkbox-option span {
     margin: 0;
     padding: 0;

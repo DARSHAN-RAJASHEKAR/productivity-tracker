@@ -101,6 +101,12 @@
                             <div class="list-items" id="today-items"></div>
                             <div class="add-item">
                                 <input type="text" id="today-input" placeholder="Add today task...">
+                                <div class="task-options">
+                                    <label class="checkbox-option">
+                                        <input type="time" id="today-time">
+                                        <span>Time (optional)</span>
+                                    </label>
+                                </div>
                                 <button onclick="addTask('today')"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
@@ -113,6 +119,10 @@
                                     <label class="checkbox-option">
                                         <input type="checkbox" id="fullweek-daily-tracking">
                                         <span>Daily tracking (complete each day)</span>
+                                    </label>
+                                    <label class="checkbox-option">
+                                        <input type="time" id="fullweek-time">
+                                        <span>Time (optional)</span>
                                     </label>
                                 </div>
                                 <button onclick="addTask('fullweek')"><i class="fas fa-plus"></i></button>
@@ -128,6 +138,10 @@
                                         <input type="checkbox" id="fullmonth-daily-tracking">
                                         <span>Daily tracking (complete each day)</span>
                                     </label>
+                                    <label class="checkbox-option">
+                                        <input type="time" id="fullmonth-time">
+                                        <span>Time (optional)</span>
+                                    </label>
                                 </div>
                                 <button onclick="addTask('fullmonth')"><i class="fas fa-plus"></i></button>
                             </div>
@@ -142,6 +156,10 @@
                                         <input type="checkbox" id="weekdays-daily-tracking">
                                         <span>Daily tracking (complete each day)</span>
                                     </label>
+                                    <label class="checkbox-option">
+                                        <input type="time" id="weekdays-time">
+                                        <span>Time (optional)</span>
+                                    </label>
                                 </div>
                                 <button onclick="addTask('weekdays')"><i class="fas fa-plus"></i></button>
                             </div>
@@ -151,23 +169,17 @@
                             <div class="list-items" id="habits-items"></div>
                             <div class="add-item">
                                 <input type="text" id="habits-input" placeholder="Add habit...">
+                                <div class="task-options">
+                                    <label class="checkbox-option">
+                                        <input type="time" id="habits-time">
+                                        <span>Time (optional)</span>
+                                    </label>
+                                </div>
                                 <button onclick="addHabit()"><i class="fas fa-plus"></i></button>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="sidebar-section">
-                        <h3>Quick Actions</h3>
-                        <button class="action-btn" onclick="clearCompleted()">
-                            <i class="fas fa-broom"></i> Clear Completed
-                        </button>
-                        <button class="action-btn" onclick="exportData()">
-                            <i class="fas fa-download"></i> Export Data
-                        </button>
-                        <button class="action-btn" onclick="importData()">
-                            <i class="fas fa-upload"></i> Import Data
-                        </button>
-                    </div>
                 </aside>
                 
                 <main class="management-content">

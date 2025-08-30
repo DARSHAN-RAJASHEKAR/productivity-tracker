@@ -40,8 +40,22 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up enter key handlers for inputs
     ['today', 'fullweek', 'fullmonth', 'weekdays', 'habits'].forEach(type => {
         const input = document.getElementById(`${type}-input`);
+        const timeInput = document.getElementById(`${type}-time`);
+        
         if (input) {
             input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    if (type === 'habits') {
+                        addHabit();
+                    } else {
+                        addTask(type);
+                    }
+                }
+            });
+        }
+        
+        if (timeInput) {
+            timeInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     if (type === 'habits') {
                         addHabit();
@@ -234,9 +248,26 @@ function addTask(type) {
     const dailyTrackingCheckbox = document.getElementById(`${type}-daily-tracking`);
     const isDailyTracking = dailyTrackingCheckbox ? dailyTrackingCheckbox.checked : false;
     
+    // Get optional time
+    const timeInput = document.getElementById(`${type}-time`);
+    const time = timeInput ? timeInput.value : '';
+    
+    // Create display text with time if provided
+    let displayText = text;
+    if (time) {
+        // Convert 24-hour to 12-hour format
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        displayText = `${text} - ${displayHour}:${minutes} ${ampm}`;
+    }
+    
     const task = {
         id: Date.now(),
-        text: text,
+        text: displayText,
+        originalText: text,
+        time: time,
         completed: false,
         createdAt: new Date().toISOString(),
         expiresAt: getTaskExpiryDate(type)?.toISOString() || null,
@@ -247,9 +278,12 @@ function addTask(type) {
     data[type].push(task);
     input.value = '';
     
-    // Reset daily tracking checkbox
+    // Reset daily tracking checkbox and time input
     if (dailyTrackingCheckbox) {
         dailyTrackingCheckbox.checked = false;
+    }
+    if (timeInput) {
+        timeInput.value = '';
     }
     
     updateListDisplay(type);
@@ -269,9 +303,26 @@ function addHabit() {
     
     if (!text) return;
     
+    // Get optional time
+    const timeInput = document.getElementById('habits-time');
+    const time = timeInput ? timeInput.value : '';
+    
+    // Create display text with time if provided
+    let displayText = text;
+    if (time) {
+        // Convert 24-hour to 12-hour format
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+        displayText = `${text} - ${displayHour}:${minutes} ${ampm}`;
+    }
+    
     const habit = {
         id: Date.now(),
-        text: text,
+        text: displayText,
+        originalText: text,
+        time: time,
         streak: 0,
         lastCompleted: null,
         createdAt: new Date().toISOString()
@@ -279,6 +330,11 @@ function addHabit() {
     
     data.habits.push(habit);
     input.value = '';
+    
+    // Reset time input
+    if (timeInput) {
+        timeInput.value = '';
+    }
     
     updateListDisplay('habits');
     updateHabitsTracker();
