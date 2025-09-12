@@ -92,7 +92,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 function updateCurrentDate() {
     const now = new Date();
     const dateOptions = { 
-        weekday: 'long', 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
@@ -1003,3 +1002,122 @@ function updateManagementView() {
         `<p><i class="fas fa-lightbulb"></i> ${tip}</p>`
     ).join('');
 }
+
+// Analytics functions
+function updateAnalytics() {
+    const period = document.getElementById('analytics-period')?.value || 30;
+    const periodDays = parseInt(period);
+    
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - periodDays);
+    
+    // Calculate task analytics
+    const taskAnalytics = calculateTaskAnalytics(startDate, endDate);
+    const habitAnalytics = calculateHabitAnalytics(startDate, endDate);
+    
+    // Update UI
+    updateAnalyticsDisplay(taskAnalytics, habitAnalytics);
+}
+
+function calculateTaskAnalytics(startDate, endDate) {
+    let totalTasks = 0;
+    let completedTasks = 0;
+    
+    // Get all tasks from all categories
+    const allTasks = [
+        ...data.today,
+        ...data.fullweek, 
+        ...data.fullmonth,
+        ...data.weekdays
+    ];
+    
+    allTasks.forEach(task => {
+        const taskDate = new Date(task.createdAt);
+        
+        // Only count tasks created in the date range
+        if (taskDate >= startDate && taskDate <= endDate) {
+            totalTasks++;
+            
+            if (task.isDailyTracking) {
+                // For daily tracking tasks, count how many days they were completed
+                const completions = Object.values(task.dailyCompletions || {});
+                completedTasks += completions.filter(Boolean).length;
+            } else if (task.completed) {
+                completedTasks++;
+            }
+        }
+    });
+    
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    
+    return {
+        total: totalTasks,
+        completed: completedTasks,
+        completionRate: completionRate
+    };
+}
+
+function calculateHabitAnalytics(startDate, endDate) {
+    // Calculate days in the period
+    const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    
+    let totalPossibleCompletions = 0;
+    let actualCompletions = 0;
+    
+    data.habits.forEach(habit => {
+        const habitStartDate = new Date(habit.createdAt);
+        
+        // Only count habits that existed during the period
+        if (habitStartDate <= endDate) {
+            // Calculate how many days this habit was available in the period
+            const actualStartDate = habitStartDate > startDate ? habitStartDate : startDate;
+            const habitDays = Math.ceil((endDate - actualStartDate) / (1000 * 60 * 60 * 24)) + 1;
+            
+            totalPossibleCompletions += habitDays;
+            
+            // Count actual completions based on streak
+            // For simplicity, assume current streak represents recent completions
+            if (habit.lastCompleted) {
+                const lastCompletedDate = new Date(habit.lastCompleted);
+                if (lastCompletedDate >= startDate && lastCompletedDate <= endDate) {
+                    // Add streak days that fall within our period
+                    actualCompletions += Math.min(habit.streak, habitDays);
+                }
+            }
+        }
+    });
+    
+    const successRate = totalPossibleCompletions > 0 ? Math.round((actualCompletions / totalPossibleCompletions) * 100) : 0;
+    
+    return {
+        total: totalPossibleCompletions,
+        completed: actualCompletions,
+        successRate: successRate
+    };
+}
+
+function updateAnalyticsDisplay(taskAnalytics, habitAnalytics) {
+    // Update task analytics
+    document.getElementById('tasks-completed').textContent = taskAnalytics.completed;
+    document.getElementById('tasks-total').textContent = taskAnalytics.total;
+    document.getElementById('tasks-completion-rate').textContent = `${taskAnalytics.completionRate}%`;
+    
+    // Update habit analytics  
+    document.getElementById('habits-completed').textContent = habitAnalytics.completed;
+    document.getElementById('habits-total').textContent = habitAnalytics.total;
+    document.getElementById('habits-completion-rate').textContent = `${habitAnalytics.successRate}%`;
+}
+
+// Initialize analytics on page load and add event listener
+document.addEventListener('DOMContentLoaded', function() {
+    // Add analytics period change listener
+    const periodSelect = document.getElementById('analytics-period');
+    if (periodSelect) {
+        periodSelect.addEventListener('change', updateAnalytics);
+    }
+    
+    // Update analytics initially (after a delay to ensure data is loaded)
+    setTimeout(updateAnalytics, 1000);
+});
