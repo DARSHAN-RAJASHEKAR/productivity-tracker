@@ -14,9 +14,9 @@ let currentTab = 'today';
 let currentPage = 'home';
 
 // Initialize app when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    loadData();
-    removeExpiredTasks(); // Clean up expired tasks on load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadData();
+    await removeExpiredTasks(); // Clean up expired tasks on load
     updateCurrentDate();
     updateTodaysTasks();
     updateStats();
@@ -189,13 +189,18 @@ function isTaskExpired(task) {
 }
 
 // Remove expired tasks
-function removeExpiredTasks() {
-    ['today', 'fullweek', 'fullmonth', 'weekdays'].forEach(type => {
-        if (data[type] && Array.isArray(data[type])) {
-            data[type] = data[type].filter(task => !isTaskExpired(task));
-        }
-    });
-    saveData();
+async function removeExpiredTasks() {
+    try {
+        await api.deleteExpiredTasks();
+        // Also filter local data
+        ['today', 'fullweek', 'fullmonth', 'weekdays'].forEach(type => {
+            if (data[type] && Array.isArray(data[type])) {
+                data[type] = data[type].filter(task => !isTaskExpired(task));
+            }
+        });
+    } catch (error) {
+        console.error('Error removing expired tasks:', error);
+    }
 }
 
 // Tab switching
@@ -232,7 +237,7 @@ function switchTab(tab) {
 }
 
 // Add task to list
-function addTask(type) {
+async function addTask(type) {
     console.log('addTask called with type:', type);
     const input = document.getElementById(`${type}-input`);
     console.log('Input element found:', input);
@@ -263,41 +268,58 @@ function addTask(type) {
         displayText = `${text} - ${displayHour}:${minutes} ${ampm}`;
     }
     
-    const task = {
-        id: Date.now(),
+    const taskData = {
         text: displayText,
-        originalText: text,
+        original_text: text,
         time: time,
+        type: type,
         completed: false,
-        createdAt: new Date().toISOString(),
-        expiresAt: getTaskExpiryDate(type)?.toISOString() || null,
-        isDailyTracking: isDailyTracking,
-        dailyCompletions: {} // Track completions by date for daily tracking tasks
+        expires_at: getTaskExpiryDate(type)?.toISOString() || null,
+        is_daily_tracking: isDailyTracking,
+        daily_completions: {}
     };
     
-    data[type].push(task);
-    input.value = '';
-    
-    // Reset daily tracking checkbox and time input
-    if (dailyTrackingCheckbox) {
-        dailyTrackingCheckbox.checked = false;
+    try {
+        const result = await api.addTask(taskData);
+        
+        // Add to local data with returned ID
+        const task = {
+            id: result[0].id,
+            text: displayText,
+            originalText: text,
+            time: time,
+            completed: false,
+            createdAt: result[0].created_at,
+            expiresAt: taskData.expires_at,
+            isDailyTracking: isDailyTracking,
+            dailyCompletions: {}
+        };
+        
+        data[type].push(task);
+        input.value = '';
+        
+        // Reset daily tracking checkbox and time input
+        if (dailyTrackingCheckbox) {
+            dailyTrackingCheckbox.checked = false;
+        }
+        if (timeInput) {
+            timeInput.value = '';
+        }
+        
+        updateListDisplay(type);
+        updateTodaysTasks();
+        updateStats();
+        if (currentPage === 'management') {
+            updateManagementView();
+        }
+    } catch (error) {
+        console.error('Error adding task:', error);
+        alert('Failed to add task. Please try again.');
     }
-    if (timeInput) {
-        timeInput.value = '';
-    }
-    
-    updateListDisplay(type);
-    updateTodaysTasks();
-    updateStats();
-    if (currentPage === 'management') {
-        updateManagementView();
-    }
-    
-    saveData();
 }
 
 // Add habit
-function addHabit() {
+async function addHabit() {
     const input = document.getElementById('habits-input');
     const text = input.value.trim();
     
@@ -318,31 +340,44 @@ function addHabit() {
         displayText = `${text} - ${displayHour}:${minutes} ${ampm}`;
     }
     
-    const habit = {
-        id: Date.now(),
+    const habitData = {
         text: displayText,
-        originalText: text,
+        original_text: text,
         time: time,
         streak: 0,
-        lastCompleted: null,
-        createdAt: new Date().toISOString()
+        last_completed: null
     };
     
-    data.habits.push(habit);
-    input.value = '';
-    
-    // Reset time input
-    if (timeInput) {
-        timeInput.value = '';
+    try {
+        const result = await api.addHabit(habitData);
+        
+        const habit = {
+            id: result[0].id,
+            text: displayText,
+            originalText: text,
+            time: time,
+            streak: 0,
+            lastCompleted: null,
+            createdAt: result[0].created_at
+        };
+        
+        data.habits.push(habit);
+        input.value = '';
+        
+        // Reset time input
+        if (timeInput) {
+            timeInput.value = '';
+        }
+        
+        updateListDisplay('habits');
+        updateHabitsTracker();
+        if (currentPage === 'management') {
+            updateManagementView();
+        }
+    } catch (error) {
+        console.error('Error adding habit:', error);
+        alert('Failed to add habit. Please try again.');
     }
-    
-    updateListDisplay('habits');
-    updateHabitsTracker();
-    if (currentPage === 'management') {
-        updateManagementView();
-    }
-    
-    saveData();
 }
 
 // Update list display in sidebar
@@ -405,9 +440,11 @@ function updateListDisplay(type) {
 }
 
 // Toggle task completion
-function toggleTask(type, id) {
+async function toggleTask(type, id) {
     const item = data[type].find(task => task.id === id);
     if (item) {
+        let updates = {};
+        
         if (item.isDailyTracking) {
             // Handle daily tracking tasks
             const today = new Date().toDateString();
@@ -415,33 +452,54 @@ function toggleTask(type, id) {
                 item.dailyCompletions = {};
             }
             item.dailyCompletions[today] = !item.dailyCompletions[today];
+            updates = {
+                daily_completions: item.dailyCompletions
+            };
         } else {
             // Handle regular tasks
             item.completed = !item.completed;
+            updates = {
+                completed: item.completed
+            };
         }
         
-        updateListDisplay(type);
-        updateTodaysTasks();
-        updateStats();
-        if (currentPage === 'management') {
-            updateManagementView();
+        try {
+            await api.updateTask(id, updates);
+            
+            updateListDisplay(type);
+            updateTodaysTasks();
+            updateStats();
+            if (currentPage === 'management') {
+                updateManagementView();
+            }
+        } catch (error) {
+            console.error('Error updating task:', error);
+            // Revert local changes on error
+            if (item.isDailyTracking) {
+                const today = new Date().toDateString();
+                item.dailyCompletions[today] = !item.dailyCompletions[today];
+            } else {
+                item.completed = !item.completed;
+            }
         }
-        saveData();
     }
 }
 
 // Toggle habit completion
-function toggleHabit(id) {
+async function toggleHabit(id) {
     const habit = data.habits.find(h => h.id === id);
     if (!habit) return;
     
     const today = new Date().toDateString();
     const wasCompletedToday = isCompletedToday(habit);
     
+    let newStreak = habit.streak;
+    let newLastCompleted = habit.lastCompleted;
+    
     if (wasCompletedToday) {
         // Uncheck - decrease streak
-        habit.streak = Math.max(0, habit.streak - 1);
-        habit.lastCompleted = habit.streak > 0 ? 
+        newStreak = Math.max(0, habit.streak - 1);
+        newLastCompleted = newStreak > 0 ? 
             new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() : null;
     } else {
         // Check - increase streak
@@ -450,18 +508,29 @@ function toggleHabit(id) {
             new Date(habit.lastCompleted).toDateString() : null;
         
         if (!habit.lastCompleted || lastCompletedDate === yesterday) {
-            habit.streak += 1;
+            newStreak += 1;
         } else {
-            habit.streak = 1; // Reset streak if not consecutive
+            newStreak = 1; // Reset streak if not consecutive
         }
         
-        habit.lastCompleted = new Date().toISOString();
+        newLastCompleted = new Date().toISOString();
     }
     
-    updateListDisplay('habits');
-    updateHabitsTracker();
-    updateStats();
-    saveData();
+    try {
+        await api.updateHabit(id, {
+            streak: newStreak,
+            last_completed: newLastCompleted
+        });
+        
+        habit.streak = newStreak;
+        habit.lastCompleted = newLastCompleted;
+        
+        updateListDisplay('habits');
+        updateHabitsTracker();
+        updateStats();
+    } catch (error) {
+        console.error('Error updating habit:', error);
+    }
 }
 
 // Check if habit was completed today
@@ -473,20 +542,30 @@ function isCompletedToday(habit) {
 }
 
 // Delete item
-function deleteItem(type, id) {
+async function deleteItem(type, id) {
     if (confirm('Are you sure you want to delete this item?')) {
-        data[type] = data[type].filter(item => item.id !== id);
-        updateListDisplay(type);
-        if (type !== 'habits') {
-            updateTodaysTasks();
-            updateStats();
-        } else {
-            updateHabitsTracker();
+        try {
+            if (type === 'habits') {
+                await api.deleteHabit(id);
+            } else {
+                await api.deleteTask(id);
+            }
+            
+            data[type] = data[type].filter(item => item.id !== id);
+            updateListDisplay(type);
+            if (type !== 'habits') {
+                updateTodaysTasks();
+                updateStats();
+            } else {
+                updateHabitsTracker();
+            }
+            if (currentPage === 'management') {
+                updateManagementView();
+            }
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            alert('Failed to delete item. Please try again.');
         }
-        if (currentPage === 'management') {
-            updateManagementView();
-        }
-        saveData();
     }
 }
 
@@ -604,18 +683,19 @@ function updateStats() {
     }
     
     // Update completion for today if all tasks are done
-    if (totalToday > 0 && completedToday === totalToday) {
-        data.completions[today] = true;
-    } else {
-        data.completions[today] = false;
+    const todayCompleted = totalToday > 0 && completedToday === totalToday;
+    if (data.completions[today] !== todayCompleted) {
+        data.completions[today] = todayCompleted;
+        // Save to Supabase
+        api.setCompletion(today, todayCompleted).catch(error => {
+            console.error('Error updating completion:', error);
+        });
     }
     
     // Update display
     document.getElementById('completed-today').textContent = completedToday;
     document.getElementById('total-today').textContent = totalToday;
     document.getElementById('streak-count').textContent = streak;
-    
-    saveData();
 }
 
 // Update habits tracker in dashboard
@@ -642,7 +722,7 @@ function updateHabitsTracker() {
 }
 
 // Add reminder
-function addReminder() {
+async function addReminder() {
     const textInput = document.getElementById('reminder-text');
     const timeInput = document.getElementById('reminder-time');
     
@@ -654,19 +734,33 @@ function addReminder() {
         return;
     }
     
-    const reminder = {
-        id: Date.now(),
+    const reminderData = {
         text: text,
         time: new Date(time).toISOString(),
-        completed: false
+        completed: false,
+        notified: false
     };
     
-    data.reminders.push(reminder);
-    textInput.value = '';
-    timeInput.value = '';
-    
-    updateReminders();
-    saveData();
+    try {
+        const result = await api.addReminder(reminderData);
+        
+        const reminder = {
+            id: result[0].id,
+            text: text,
+            time: reminderData.time,
+            completed: false,
+            notified: false
+        };
+        
+        data.reminders.push(reminder);
+        textInput.value = '';
+        timeInput.value = '';
+        
+        updateReminders();
+    } catch (error) {
+        console.error('Error adding reminder:', error);
+        alert('Failed to add reminder. Please try again.');
+    }
 }
 
 // Update reminders display
@@ -703,10 +797,15 @@ function updateReminders() {
 }
 
 // Delete reminder
-function deleteReminder(id) {
-    data.reminders = data.reminders.filter(r => r.id !== id);
-    updateReminders();
-    saveData();
+async function deleteReminder(id) {
+    try {
+        await api.deleteReminder(id);
+        data.reminders = data.reminders.filter(r => r.id !== id);
+        updateReminders();
+    } catch (error) {
+        console.error('Error deleting reminder:', error);
+        alert('Failed to delete reminder. Please try again.');
+    }
 }
 
 // Check for overdue reminders
@@ -725,7 +824,6 @@ function checkReminders() {
             reminder.notified = true;
         }
     });
-    saveData();
 }
 
 // Clear completed tasks
@@ -741,7 +839,6 @@ function clearCompleted() {
         if (currentPage === 'management') {
             updateManagementView();
         }
-        saveData();
     }
 }
 
@@ -784,7 +881,6 @@ function handleFileImport(event) {
                 if (currentPage === 'management') {
                     updateManagementView();
                 }
-                saveData();
                 alert('Data imported successfully!');
             }
         } catch (error) {
@@ -794,50 +890,35 @@ function handleFileImport(event) {
     reader.readAsText(file);
 }
 
-// Save data to localStorage
-function saveData() {
-    localStorage.setItem('productivityData', JSON.stringify(data));
-}
+// No longer needed - data is saved directly to Supabase in each operation
 
-// Load data from localStorage
-function loadData() {
-    const saved = localStorage.getItem('productivityData');
-    if (saved) {
-        try {
-            const loadedData = JSON.parse(saved);
-            // Merge with default structure to ensure all properties exist
-            data = {
-                today: loadedData.today || loadedData.daily || [],
-                fullweek: loadedData.fullweek || loadedData.weekly || [],
-                fullmonth: loadedData.fullmonth || loadedData.monthly || [],
-                weekdays: loadedData.weekdays || [],
-                habits: loadedData.habits || [],
-                reminders: loadedData.reminders || [],
-                completions: loadedData.completions || {}
-            };
-        } catch (error) {
-            console.error('Error loading saved data:', error);
-            data = {
-                today: [],
-                fullweek: [],
-                fullmonth: [],
-                weekdays: [],
-                habits: [],
-                reminders: [],
-                completions: {}
-            };
+// Load data from Supabase
+async function loadData() {
+    try {
+        data = await api.loadAllData();
+    } catch (error) {
+        console.error('Error loading data from Supabase:', error);
+        // Fall back to localStorage if available
+        const saved = localStorage.getItem('productivityData');
+        if (saved) {
+            try {
+                const loadedData = JSON.parse(saved);
+                data = {
+                    today: loadedData.today || loadedData.daily || [],
+                    fullweek: loadedData.fullweek || loadedData.weekly || [],
+                    fullmonth: loadedData.fullmonth || loadedData.monthly || [],
+                    weekdays: loadedData.weekdays || [],
+                    habits: loadedData.habits || [],
+                    reminders: loadedData.reminders || [],
+                    completions: loadedData.completions || {}
+                };
+            } catch (parseError) {
+                console.error('Error parsing localStorage data:', parseError);
+                initializeEmptyData();
+            }
+        } else {
+            initializeEmptyData();
         }
-    } else {
-        // Initialize with default structure
-        data = {
-            today: [],
-            fullweek: [],
-            fullmonth: [],
-            weekdays: [],
-            habits: [],
-            reminders: [],
-            completions: {}
-        };
     }
     
     // Request notification permission
@@ -846,6 +927,18 @@ function loadData() {
     }
     
     updateListDisplay(currentTab);
+}
+
+function initializeEmptyData() {
+    data = {
+        today: [],
+        fullweek: [],
+        fullmonth: [],
+        weekdays: [],
+        habits: [],
+        reminders: [],
+        completions: {}
+    };
 }
 
 // Update management view with current tab info
