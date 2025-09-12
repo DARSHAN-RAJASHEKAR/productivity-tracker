@@ -1,9 +1,9 @@
 // Supabase Configuration
-// Replace these with your actual Supabase project credentials
+// IMPORTANT: Set your actual credentials in the environment variables below
 
 const SUPABASE_CONFIG = {
-    url: 'https://uqspfkiyzhxkglrjkxlt.supabase.co',
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxc3Bma2l5emh4a2dscmpreGx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2ODkxODMsImV4cCI6MjA3MzI2NTE4M30.0I3wOaXNQssPOjosFy5ZmUuRDnNYwJ3NA_YAJ-NR4BM'
+    url: window.ENV?.SUPABASE_URL || 'YOUR_SUPABASE_PROJECT_URL',
+    key: window.ENV?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY'
 };
 
 // Supabase API endpoints
