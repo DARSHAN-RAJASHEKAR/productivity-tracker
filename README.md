@@ -12,6 +12,8 @@ A web-based productivity tracker with cloud database storage using Supabase.
 ## Live Demo
 🌐 [View App](https://darshan-rajashekar.github.io/productivity-tracker/)
 
+*Deployed using GitHub Actions with secure environment variables*
+
 ## Technology Stack
 - **Frontend**: HTML, CSS, JavaScript
 - **Database**: Supabase PostgreSQL
