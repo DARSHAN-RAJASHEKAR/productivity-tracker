@@ -667,20 +667,6 @@ function updateStats() {
         });
     }
     
-    // Calculate current streak (consecutive days with all tasks completed)
-    let streak = 0;
-    const completionHistory = data.completions || {};
-    let checkDate = new Date(now);
-    
-    while (true) {
-        const dateStr = checkDate.toDateString();
-        if (completionHistory[dateStr] === true) {
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-        } else {
-            break;
-        }
-    }
     
     // Update completion for today if all tasks are done
     const todayCompleted = totalToday > 0 && completedToday === totalToday;
@@ -695,7 +681,6 @@ function updateStats() {
     // Update display
     document.getElementById('completed-today').textContent = completedToday;
     document.getElementById('total-today').textContent = totalToday;
-    document.getElementById('streak-count').textContent = streak;
 }
 
 // Update habits tracker in dashboard
